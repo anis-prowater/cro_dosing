@@ -4,18 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Central RO — Service &amp; Dosing Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     color-scheme: light;
-    --surface-1:      #fcfcfb;
+    --surface-1:      #ffffff;
     --surface-2:      #ffffff;
-    --page:           #eef5f8;
-    --text-primary:   #0b0b0b;
-    --text-secondary: #52514e;
-    --text-muted:     #898781;
-    --grid:           #e1e0d9;
-    --baseline:       #c3c2b7;
-    --border:         rgba(11,11,11,0.10);
+    --page:           #fafdf7;
+    --text-primary:   #0d2818;
+    --text-secondary: #43594c;
+    --text-muted:     #7c8f81;
+    --grid:           #e3ecdd;
+    --baseline:       #c7d6c0;
+    --border:         rgba(13,40,24,0.10);
 
     --series-1: #2a78d6; /* blue   */
     --series-2: #eb6834; /* orange */
@@ -32,21 +35,24 @@
     --status-critical: #d03b3b;
     --status-pending:  #898781;
 
-    --brand-1: #0e6ba8; /* deep water blue */
-    --brand-2: #1baf9a; /* teal */
+    --brand-dark: #0d2818; /* ProWater forest green */
+    --brand-mid:  #2d7a4f; /* mid green */
+    --brand-lime: #a8d940; /* lime accent */
+    --brand-1: #0d2818;
+    --brand-2: #2d7a4f;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       color-scheme: dark;
-      --surface-1:      #1a1a19;
-      --surface-2:      #202020;
-      --page:           #0c1416;
-      --text-primary:   #ffffff;
-      --text-secondary: #c3c2b7;
-      --text-muted:     #898781;
-      --grid:           #2c2c2a;
-      --baseline:       #383835;
-      --border:         rgba(255,255,255,0.10);
+      --surface-1:      #12241a;
+      --surface-2:      #16301f;
+      --page:           #08130d;
+      --text-primary:   #f2f8ee;
+      --text-secondary: #b9ccb4;
+      --text-muted:     #83967f;
+      --grid:           #223a29;
+      --baseline:       #35513e;
+      --border:         rgba(168,217,64,0.14);
 
       --series-1: #3987e5;
       --series-2: #d95926;
@@ -57,21 +63,24 @@
       --series-7: #9085e9;
       --series-8: #e66767;
 
-      --brand-1: #1c5cab;
-      --brand-2: #199e70;
+      --brand-dark: #08130d;
+      --brand-mid:  #2d7a4f;
+      --brand-lime: #a8d940;
+      --brand-1: #08130d;
+      --brand-2: #2d7a4f;
     }
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --surface-1:      #1a1a19;
-    --surface-2:      #202020;
-    --page:           #0c1416;
-    --text-primary:   #ffffff;
-    --text-secondary: #c3c2b7;
-    --text-muted:     #898781;
-    --grid:           #2c2c2a;
-    --baseline:       #383835;
-    --border:         rgba(255,255,255,0.10);
+    --surface-1:      #12241a;
+    --surface-2:      #16301f;
+    --page:           #08130d;
+    --text-primary:   #f2f8ee;
+    --text-secondary: #b9ccb4;
+    --text-muted:     #83967f;
+    --grid:           #223a29;
+    --baseline:       #35513e;
+    --border:         rgba(168,217,64,0.14);
 
     --series-1: #3987e5;
     --series-2: #d95926;
@@ -82,8 +91,11 @@
     --series-7: #9085e9;
     --series-8: #e66767;
 
-    --brand-1: #1c5cab;
-    --brand-2: #199e70;
+    --brand-dark: #08130d;
+    --brand-mid:  #2d7a4f;
+    --brand-lime: #a8d940;
+    --brand-1: #08130d;
+    --brand-2: #2d7a4f;
   }
 
   * { box-sizing: border-box; }
@@ -91,45 +103,52 @@
     margin: 0; padding: 0;
     background: var(--page);
     color: var(--text-primary);
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-family: 'Poppins', system-ui, -apple-system, "Segoe UI", sans-serif;
   }
   body { padding-bottom: 30px; }
   .wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
 
   /* ---- themed header band ---- */
   .hero {
-    background: linear-gradient(120deg, var(--brand-1), var(--brand-2));
-    background-size: 200% 200%;
+    background: radial-gradient(circle at 85% 20%, rgba(168,217,64,0.16) 0, transparent 45%),
+                linear-gradient(160deg, var(--brand-dark), #133a24 65%, var(--brand-mid));
     position: relative;
     overflow: hidden;
-    padding: 28px 0 34px;
+    padding: 30px 0 40px;
     margin-bottom: -20px;
   }
   .hero::before {
     content: "";
     position: absolute; inset: 0;
     background-image:
-      radial-gradient(circle at 12% 30%, rgba(255,255,255,0.14) 0, transparent 55%),
-      radial-gradient(circle at 85% 75%, rgba(255,255,255,0.10) 0, transparent 50%);
+      radial-gradient(circle at 12% 30%, rgba(168,217,64,0.10) 0, transparent 55%),
+      radial-gradient(circle at 92% 85%, rgba(168,217,64,0.08) 0, transparent 50%);
     pointer-events: none;
   }
   .hero .wrap { position: relative; }
   header.top {
-    display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
-    gap: 12px;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    gap: 14px;
   }
-  .title-block { display: flex; align-items: center; gap: 12px; }
-  .drop-icon { width: 34px; height: 34px; flex-shrink: 0; }
-  header.top h1 { font-size: 22px; margin: 0 0 3px; letter-spacing: -0.01em; color: #fff; }
-  header.top p.sub { margin: 0; color: rgba(255,255,255,0.85); font-size: 13px; }
-  .top-actions { display: flex; align-items: center; gap: 10px; font-size: 12px; color: rgba(255,255,255,0.9); }
-  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #6bffb0; display: inline-block; margin-right: 6px; box-shadow: 0 0 0 3px rgba(107,255,176,0.25); }
+  .title-block { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .drop-icon { width: 36px; height: 36px; flex-shrink: 0; }
+  .live-badge {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand-lime);
+    background: rgba(168,217,64,0.12); border: 1px solid rgba(168,217,64,0.35);
+    border-radius: 999px; padding: 4px 11px;
+  }
+  .live-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand-lime); box-shadow: 0 0 0 3px rgba(168,217,64,0.25); }
+  header.top h1 { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 26px; margin: 0; letter-spacing: -0.01em; color: #fff; }
+  header.top p.sub { margin: 0; color: rgba(238,247,232,0.78); font-size: 13px; }
+  .top-actions { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 12px; color: rgba(238,247,232,0.85); }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--brand-lime); display: inline-block; margin-right: 6px; box-shadow: 0 0 0 3px rgba(168,217,64,0.25); }
   button.refresh {
-    font: inherit; font-size: 12px; font-weight: 600; color: var(--brand-1);
-    background: #fff; border: 1px solid rgba(255,255,255,0.5); border-radius: 8px;
-    padding: 6px 12px; cursor: pointer;
+    font: inherit; font-size: 12px; font-weight: 700; color: var(--brand-dark);
+    background: linear-gradient(135deg, #cbe97a, var(--brand-lime)); border: none; border-radius: 999px;
+    padding: 8px 16px; cursor: pointer; box-shadow: 0 2px 10px rgba(168,217,64,0.25);
   }
-  button.refresh:hover { background: #f0f7fb; }
+  button.refresh:hover { filter: brightness(1.05); }
 
   .content { padding-top: 34px; }
 
@@ -144,20 +163,20 @@
     display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 18px;
   }
   .kpi {
-    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
-    padding: 14px 16px 14px 14px; border-left: 3px solid var(--accent, var(--brand-1));
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px;
+    padding: 14px 16px 14px 14px; border-left: 3px solid var(--accent, var(--brand-mid));
+    box-shadow: 0 2px 8px rgba(13,40,24,0.05);
   }
-  .kpi .label { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
-  .kpi .value { font-size: 26px; font-weight: 650; line-height: 1; }
+  .kpi .label { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; font-weight: 500; }
+  .kpi .value { font-size: 27px; font-weight: 700; line-height: 1; }
   .kpi .value .unit { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-left: 3px; }
 
-  .charts-row { display: grid; grid-template-columns: 1.3fr 1fr; gap: 12px; margin-bottom: 18px; }
+  .charts-row { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 18px; }
   .card {
-    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
-    position: relative; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px; padding: 18px;
+    position: relative; box-shadow: 0 2px 8px rgba(13,40,24,0.05);
   }
-  .card h3 { font-size: 14px; margin: 0 0 2px; font-weight: 650; }
+  .card h3 { font-family: 'Playfair Display', serif; font-size: 17px; margin: 0 0 2px; font-weight: 700; }
   .card p.hint { margin: 0 0 12px; font-size: 12px; color: var(--text-muted); }
   .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: var(--text-secondary); }
   .legend .item { display: flex; align-items: center; gap: 6px; }
@@ -165,9 +184,10 @@
 
   .filters { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
   .filters select, .filters input {
-    font: inherit; font-size: 13px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border);
+    font: inherit; font-size: 13px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--border);
     background: var(--surface-2); color: var(--text-primary);
   }
+  .filters select:focus, .filters input:focus { outline: none; border-color: var(--brand-mid); }
   .filters .count-note { font-size: 12px; color: var(--text-muted); margin-left: auto; }
 
   table.log { width: 100%; border-collapse: collapse; font-size: 12.5px; }
@@ -185,7 +205,7 @@
   .badge.critical .dot { background: var(--status-critical); }
   .badge.pending { color: var(--text-secondary); background: color-mix(in srgb, var(--status-pending) 16%, transparent); }
   .badge.pending .dot { background: var(--status-pending); }
-  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); padding: 4px; }
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-1); padding: 4px; }
 
   .tooltip {
     position: absolute; pointer-events: none; background: var(--surface-2); border: 1px solid var(--border);
@@ -200,32 +220,114 @@
   .empty-state { text-align: center; padding: 40px 10px; color: var(--text-muted); font-size: 13px; }
 
   footer { text-align: center; color: var(--text-muted); font-size: 11.5px; margin: 22px 0 6px; }
-  footer a { color: inherit; }
+  footer a { color: var(--brand-mid); font-weight: 600; text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
 
   @media (max-width: 900px) {
     .kpi-row { grid-template-columns: repeat(2, 1fr); }
     .charts-row { grid-template-columns: 1fr; }
   }
+
+  #appRoot.hidden { display: none; }
+
+  .login-overlay {
+    position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    background: radial-gradient(circle at 85% 15%, rgba(168,217,64,0.14) 0, transparent 45%),
+                linear-gradient(160deg, var(--brand-dark), #133a24 65%, var(--brand-mid));
+  }
+  .login-overlay.hidden { display: none; }
+  .login-card {
+    width: 100%; max-width: 360px; background: var(--surface-2); border-radius: 18px;
+    padding: 30px 28px; box-shadow: 0 10px 40px rgba(0,0,0,0.35); text-align: center;
+  }
+  .login-card .drop-icon { width: 40px; height: 40px; margin-bottom: 8px; }
+  .login-card h2 { font-family: 'Playfair Display', serif; font-size: 20px; margin: 0 0 4px; color: var(--text-primary); }
+  .login-card p.sub { margin: 0 0 20px; font-size: 12.5px; color: var(--text-muted); }
+  .login-field { text-align: left; margin-bottom: 14px; }
+  .login-field label { display: block; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .login-field input {
+    width: 100%; font: inherit; font-size: 14px; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary);
+  }
+  .login-field input:focus { outline: none; border-color: var(--brand-mid); }
+  .login-error {
+    display: none; background: color-mix(in srgb, var(--status-critical) 12%, transparent);
+    color: var(--status-critical); font-size: 12.5px; border-radius: 8px; padding: 8px 10px; margin-bottom: 14px;
+  }
+  .login-error.show { display: block; }
+  button.login-submit {
+    width: 100%; font: inherit; font-size: 14px; font-weight: 700; color: var(--brand-dark);
+    background: linear-gradient(135deg, #cbe97a, var(--brand-lime)); border: none; border-radius: 999px;
+    padding: 11px; cursor: pointer; box-shadow: 0 2px 10px rgba(168,217,64,0.25);
+  }
+  button.login-submit:hover { filter: brightness(1.05); }
+  button.login-submit:disabled { opacity: 0.6; cursor: default; }
+
+  .user-chip { display: flex; align-items: center; gap: 8px; }
+  .user-chip .name { font-weight: 600; color: #fff; }
+  .user-chip .role {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    background: rgba(168,217,64,0.18); color: var(--brand-lime); border-radius: 999px; padding: 2px 8px;
+  }
+  button.logout-link {
+    font: inherit; font-size: 12px; color: rgba(238,247,232,0.85); background: none; border: none;
+    text-decoration: underline; cursor: pointer; padding: 0;
+  }
+
+  .log-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .log-table th, .log-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  .log-table th { color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 10px; }
 </style>
 </head>
 <body>
 
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <svg class="drop-icon" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 4C12 4 5 13.2 5 17.5C5 21.6 8.13 24 12 24C15.87 24 19 21.6 19 17.5C19 13.2 12 4 12 4Z" fill="var(--brand-mid)"/>
+      <path d="M8.8 17.6C8.8 19.7 10.2 21 12 21" stroke="#fff" stroke-width="1.3" stroke-linecap="round" opacity="0.5"/>
+    </svg>
+    <h2>Central RO Dashboard</h2>
+    <p class="sub">Sign in with your staff ID to continue.</p>
+    <div class="login-error" id="loginError"></div>
+    <form id="loginForm">
+      <div class="login-field">
+        <label for="loginId">Staff ID</label>
+        <input id="loginId" type="text" autocomplete="username" placeholder="e.g. PW-014" required>
+      </div>
+      <div class="login-field">
+        <label for="loginPassword">Password</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="login-submit" id="loginSubmit">Sign in</button>
+    </form>
+  </div>
+</div>
+
+<div id="appRoot" class="hidden">
 <div class="hero">
   <div class="wrap">
     <header class="top">
       <div class="title-block">
-        <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2C12 2 5 11.2 5 15.5C5 19.6 8.13 22 12 22C15.87 22 19 19.6 19 15.5C19 11.2 12 2 12 2Z" fill="rgba(255,255,255,0.92)"/>
-          <path d="M8.6 15.8C8.6 17.9 10.1 19.3 12 19.3" stroke="var(--brand-1)" stroke-width="1.4" stroke-linecap="round" opacity="0.55"/>
+        <svg class="drop-icon" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 4C12 4 5 13.2 5 17.5C5 21.6 8.13 24 12 24C15.87 24 19 21.6 19 17.5C19 13.2 12 4 12 4Z" fill="var(--brand-lime)"/>
+          <path d="M8.8 17.6C8.8 19.7 10.2 21 12 21" stroke="var(--brand-dark)" stroke-width="1.3" stroke-linecap="round" opacity="0.45"/>
+          <path d="M9 4.5C9.6 2.8 11.2 1.7 12.6 2C11.6 3.2 11.3 4.2 11.4 5.4" fill="var(--brand-lime)" opacity="0.85"/>
+          <path d="M15 3.6C15.9 2.2 17.6 1.5 19 2.1C17.8 3.1 17.3 4.1 17.2 5.3" fill="var(--brand-lime)" opacity="0.6"/>
         </svg>
-        <div>
-          <h1>Central RO — Service &amp; Dosing Dashboard</h1>
-          <p class="sub">Installation &amp; chemical dosing service schedule, live from Google Sheets.</p>
-        </div>
+        <div class="live-badge"><span class="dot"></span>Live dashboard</div>
+        <h1>Central RO — Service &amp; Dosing Dashboard</h1>
+        <p class="sub">Installation &amp; chemical dosing service schedule, live from Google Sheets.</p>
       </div>
       <div class="top-actions">
         <span><span class="live-dot"></span><span id="updatedAt">Loading…</span></span>
         <button class="refresh" id="refreshBtn">Refresh</button>
+      </div>
+      <div class="user-chip">
+        <span class="name" id="userName"></span>
+        <span class="role" id="userRole"></span>
+        <button class="logout-link" id="logoutBtn">Log out</button>
       </div>
     </header>
   </div>
@@ -249,11 +351,6 @@
       <p class="hint">Days until next dosing service — negative means overdue</p>
       <div id="statusChart"></div>
       <div class="legend" id="statusLegend"></div>
-    </div>
-    <div class="card">
-      <h3>Installations by Month</h3>
-      <p class="hint">Central RO units installed, by month</p>
-      <div id="installChart"></div>
     </div>
   </section>
 
@@ -285,9 +382,21 @@
     </div>
   </section>
 
+  <section class="card" id="activityLogCard" style="display:none; margin-bottom: 18px;">
+    <h3>Activity Log</h3>
+    <p class="hint">Admin only — recent logins and actions</p>
+    <div class="table-scroll">
+      <table class="log-table" id="activityLogTable">
+        <thead><tr><th>Time</th><th>Staff ID</th><th>Role</th><th>Event</th><th>Details</th></tr></thead>
+        <tbody id="activityLogBody"></tbody>
+      </table>
+    </div>
+  </section>
+
   <footer>
     Data source: <a href="https://docs.google.com/spreadsheets/d/1jXOMXar7PR_qUjTqx5jRyRXmUpgQOadvGjssPGW--t4/edit" target="_blank" rel="noopener">Google Sheet</a> · Central RO Service &amp; Dosing
   </footer>
+</div>
 </div>
 
 <div class="tooltip" id="tooltip"></div>
@@ -295,6 +404,106 @@
 <script>
 const SHEET_ID = "1jXOMXar7PR_qUjTqx5jRyRXmUpgQOadvGjssPGW--t4";
 const GID = "0";
+
+// Paste the Apps Script Web App /exec URL here once deployed (see Code.gs setup steps).
+const APPS_SCRIPT_URL = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
+
+const auth = { token: null, id: null, name: null, role: null };
+
+function loadSession() {
+  try {
+    const raw = sessionStorage.getItem("roDashboardSession");
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+    auth.token = s.token; auth.id = s.id; auth.name = s.name; auth.role = s.role;
+    return true;
+  } catch { return false; }
+}
+function saveSession() {
+  sessionStorage.setItem("roDashboardSession", JSON.stringify(auth));
+}
+function clearSession() {
+  sessionStorage.removeItem("roDashboardSession");
+  auth.token = null; auth.id = null; auth.name = null; auth.role = null;
+}
+
+async function callBackend(payload) {
+  const res = await fetch(APPS_SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" }, // avoids a CORS preflight against Apps Script
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+function logEvent(event, details) {
+  if (!auth.token || APPS_SCRIPT_URL.includes("PASTE_YOUR")) return;
+  callBackend({ action: "log", token: auth.token, event, details: details || "" }).catch(() => {});
+}
+
+function showApp() {
+  document.getElementById("loginOverlay").classList.add("hidden");
+  document.getElementById("appRoot").classList.remove("hidden");
+  document.getElementById("userName").textContent = auth.name || auth.id;
+  document.getElementById("userRole").textContent = auth.role;
+  document.getElementById("activityLogCard").style.display = String(auth.role).toLowerCase() === "admin" ? "block" : "none";
+  load();
+  if (String(auth.role).toLowerCase() === "admin") loadActivityLog();
+}
+function showLogin() {
+  document.getElementById("appRoot").classList.add("hidden");
+  document.getElementById("loginOverlay").classList.remove("hidden");
+}
+
+async function loadActivityLog() {
+  try {
+    const res = await callBackend({ action: "listLogs", token: auth.token, limit: 100 });
+    if (!res.ok) return;
+    document.getElementById("activityLogBody").innerHTML = res.logs.map(l => `<tr>
+      <td>${new Date(l.timestamp).toLocaleString("en-IN")}</td>
+      <td>${l.userId}</td><td>${l.role}</td><td>${l.event}</td><td>${l.details || ""}</td>
+    </tr>`).join("");
+  } catch (err) { console.error(err); }
+}
+
+document.getElementById("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = document.getElementById("loginId").value.trim();
+  const password = document.getElementById("loginPassword").value;
+  const errorBox = document.getElementById("loginError");
+  const submitBtn = document.getElementById("loginSubmit");
+  errorBox.classList.remove("show");
+
+  if (APPS_SCRIPT_URL.includes("PASTE_YOUR")) {
+    errorBox.textContent = "Backend not configured yet — set APPS_SCRIPT_URL in the script.";
+    errorBox.classList.add("show");
+    return;
+  }
+
+  submitBtn.disabled = true; submitBtn.textContent = "Signing in…";
+  try {
+    const res = await callBackend({ action: "login", id, password });
+    if (!res.ok) {
+      errorBox.textContent = res.error || "Invalid ID or password";
+      errorBox.classList.add("show");
+      return;
+    }
+    auth.token = res.token; auth.id = id; auth.name = res.name; auth.role = res.role;
+    saveSession();
+    showApp();
+  } catch (err) {
+    errorBox.textContent = "Couldn't reach the login server. Try again.";
+    errorBox.classList.add("show");
+  } finally {
+    submitBtn.disabled = false; submitBtn.textContent = "Sign in";
+  }
+});
+
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  try { await callBackend({ action: "logout", token: auth.token }); } catch {}
+  clearSession();
+  showLogin();
+});
 
 const COLUMN_SYNONYMS = {
   serial:      ["serial no", "serial", "sno", "no"],
@@ -403,7 +612,7 @@ function renderStatusChart(rows) {
   const scheduled = rows.filter(r => r.daysLeft != null).sort((a, b) => a.daysLeft - b.daysLeft);
   if (!scheduled.length) { el.innerHTML = '<div class="empty-state">No scheduled services yet.</div>'; document.getElementById("statusLegend").innerHTML = ""; return; }
 
-  const rowH = 24, PAD_L = 150, PAD_R = 46, W = el.clientWidth || 600;
+  const rowH = 24, PAD_L = 172, PAD_R = 46, W = el.clientWidth || 600;
   const H = scheduled.length * rowH + 10;
   const maxAbs = Math.max(...scheduled.map(r => Math.abs(r.daysLeft)), 7);
   const zeroX = PAD_L + (W - PAD_L - PAD_R) * (maxAbs / (2 * maxAbs));
@@ -415,7 +624,7 @@ function renderStatusChart(rows) {
     const color = STATUS_DEFS.find(s => s.key === status).color;
     const barW = Math.max(Math.abs(r.daysLeft) * scaleW, 2);
     const x = r.daysLeft >= 0 ? zeroX : zeroX - barW;
-    return `<text x="${PAD_L - 8}" y="${y + 12}" text-anchor="end" font-size="10.5" fill="var(--text-secondary)">${r.apartment}</text>
+    return `<text x="${PAD_L - 8}" y="${y + 12}" text-anchor="end" font-size="10" font-family="Poppins, system-ui, sans-serif" fill="var(--text-secondary)">${r.apartment}</text>
       <rect x="${x}" y="${y}" width="${barW}" height="14" rx="3" fill="${color}" data-name="${r.apartment}" data-days="${r.daysLeft}"/>`;
   }).join("");
 
@@ -433,49 +642,6 @@ function renderStatusChart(rows) {
     rect.addEventListener("mousemove", e => {
       const d = Number(rect.dataset.days);
       tooltip.innerHTML = `<div class="t-title">${rect.dataset.name}</div><div>${d < 0 ? Math.abs(d) + " days overdue" : d + " days left"}</div>`;
-      tooltip.style.left = (e.clientX + 14) + "px";
-      tooltip.style.top = (e.clientY - 10) + "px";
-      tooltip.classList.add("show");
-    });
-    rect.addEventListener("mouseleave", () => tooltip.classList.remove("show"));
-  });
-}
-
-function renderInstallChart(rows) {
-  const el = document.getElementById("installChart");
-  const withDate = rows.filter(r => r.installed).sort((a, b) => a.installed - b.installed);
-  if (!withDate.length) { el.innerHTML = '<div class="empty-state">No installation dates found.</div>'; return; }
-
-  const counts = {};
-  withDate.forEach(r => {
-    const key = r.installed.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-    counts[key] = (counts[key] || 0) + 1;
-  });
-  const entries = Object.entries(counts);
-  const W = el.clientWidth || 420, PAD = { l: 30, r: 10, t: 10, b: 34 };
-  const barGap = 6;
-  const barW = Math.max(((W - PAD.l - PAD.r) / entries.length) - barGap, 6);
-  const H = 220;
-  const maxVal = Math.max(...entries.map(e => e[1]));
-  const yScale = v => (H - PAD.t - PAD.b) * (v / maxVal);
-
-  const bars = entries.map(([label, val], i) => {
-    const x = PAD.l + i * (barW + barGap);
-    const h = yScale(val);
-    const y = H - PAD.b - h;
-    return `<rect x="${x}" y="${y}" width="${barW}" height="${Math.max(h,2)}" rx="4" fill="var(--series-1)" data-label="${label}" data-val="${val}"/>
-      <text x="${x + barW/2}" y="${H - PAD.b + 14}" text-anchor="middle" font-size="9.5" fill="var(--text-muted)">${label}</text>`;
-  }).join("");
-
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">
-    <line x1="${PAD.l}" x2="${W - PAD.r}" y1="${H - PAD.b}" y2="${H - PAD.b}" stroke="var(--baseline)" stroke-width="1"/>
-    ${bars}
-  </svg>`;
-
-  const tooltip = document.getElementById("tooltip");
-  el.querySelectorAll("rect[data-label]").forEach(rect => {
-    rect.addEventListener("mousemove", e => {
-      tooltip.innerHTML = `<div class="t-title">${rect.dataset.label}</div><div>${rect.dataset.val} installed</div>`;
       tooltip.style.left = (e.clientX + 14) + "px";
       tooltip.style.top = (e.clientY - 10) + "px";
       tooltip.classList.add("show");
@@ -503,10 +669,10 @@ function renderTable(rows) {
   document.getElementById("emptyState").style.display = filtered.length ? "none" : "block";
 
   const statusLabel = { good: "On schedule", warning: "Due soon", critical: "Overdue", pending: "Not yet scheduled" };
-  document.getElementById("logBody").innerHTML = filtered.map(r => {
+  document.getElementById("logBody").innerHTML = filtered.map((r, i) => {
     const st = computeStatus(r);
     return `<tr>
-      <td class="num">${r.serial ?? "—"}</td>
+      <td class="num">${i + 1}</td>
       <td>${r.apartment}</td>
       <td>${fmtDate(r.installed)}</td>
       <td>${fmtDate(r.lastService)}</td>
@@ -525,9 +691,9 @@ async function load() {
     state.rows = rows;
     renderKpis(rows);
     renderStatusChart(rows);
-    renderInstallChart(rows);
     renderTable(rows);
     document.getElementById("updatedAt").textContent = "Updated " + new Date().toLocaleTimeString();
+    logEvent("view_dashboard", `${rows.length} apartments`);
   } catch (err) {
     console.error(err);
     document.getElementById("errorBanner").classList.add("show");
@@ -539,7 +705,11 @@ document.getElementById("refreshBtn").addEventListener("click", load);
 document.getElementById("statusFilter").addEventListener("change", () => renderTable(state.rows));
 document.getElementById("searchBox").addEventListener("input", () => renderTable(state.rows));
 
-load();
+if (loadSession()) {
+  showApp();
+} else {
+  showLogin();
+}
 </script>
 </body>
 </html>
