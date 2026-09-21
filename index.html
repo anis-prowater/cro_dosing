@@ -1,715 +1,170 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Central RO — Service &amp; Dosing Dashboard</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  :root {
-    color-scheme: light;
-    --surface-1:      #ffffff;
-    --surface-2:      #ffffff;
-    --page:           #fafdf7;
-    --text-primary:   #0d2818;
-    --text-secondary: #43594c;
-    --text-muted:     #7c8f81;
-    --grid:           #e3ecdd;
-    --baseline:       #c7d6c0;
-    --border:         rgba(13,40,24,0.10);
+/**
+ * Central RO Dashboard — Access Control backend.
+ *
+ * Deploy this bound to a NEW, PRIVATE Google Sheet (do NOT share it —
+ * unlike the data sheet, this one must stay locked down since it holds
+ * user records). See setup steps in the chat reply that shipped this file.
+ *
+ * Sheet tabs expected on that private spreadsheet:
+ *   "Users": ID | Name | Role | PasswordHash | Active | CreatedAt
+ *   "Logs":  Timestamp | UserID | Role | Event | Details
+ *
+ * Roles used by the dashboard: Admin, Technician, Viewer (case-insensitive).
+ */
 
-    --series-1: #2a78d6; /* blue   */
-    --series-2: #eb6834; /* orange */
-    --series-3: #1baf7a; /* aqua   */
-    --series-4: #eda100; /* yellow */
-    --series-5: #e87ba4; /* magenta*/
-    --series-6: #008300; /* green  */
-    --series-7: #4a3aa7; /* violet */
-    --series-8: #e34948; /* red    */
+const SESSION_TTL_SECONDS = 8 * 60 * 60; // 8 hours
 
-    --status-good:     #0ca30c;
-    --status-warning:  #fab219;
-    --status-serious:  #ec835a;
-    --status-critical: #d03b3b;
-    --status-pending:  #898781;
+function getUsersSheet() {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Users");
+}
+function getLogsSheet() {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Logs");
+}
 
-    --brand-dark: #0d2818; /* ProWater forest green */
-    --brand-mid:  #2d7a4f; /* mid green */
-    --brand-lime: #a8d940; /* lime accent */
-    --brand-1: #0d2818;
-    --brand-2: #2d7a4f;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      color-scheme: dark;
-      --surface-1:      #12241a;
-      --surface-2:      #16301f;
-      --page:           #08130d;
-      --text-primary:   #f2f8ee;
-      --text-secondary: #b9ccb4;
-      --text-muted:     #83967f;
-      --grid:           #223a29;
-      --baseline:       #35513e;
-      --border:         rgba(168,217,64,0.14);
+function hashPassword(plain) {
+  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, plain, Utilities.Charset.UTF_8);
+  return digest.map(b => (b < 0 ? b + 256 : b).toString(16).padStart(2, "0")).join("");
+}
 
-      --series-1: #3987e5;
-      --series-2: #d95926;
-      --series-3: #199e70;
-      --series-4: #c98500;
-      --series-5: #d55181;
-      --series-6: #008300;
-      --series-7: #9085e9;
-      --series-8: #e66767;
-
-      --brand-dark: #08130d;
-      --brand-mid:  #2d7a4f;
-      --brand-lime: #a8d940;
-      --brand-1: #08130d;
-      --brand-2: #2d7a4f;
+function findUserRow(id) {
+  const sheet = getUsersSheet();
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === String(id).trim()) {
+      return { rowIndex: i + 1, id: data[i][0], name: data[i][1], role: data[i][2], hash: data[i][3], active: data[i][4] };
     }
   }
-  :root[data-theme="dark"] {
-    color-scheme: dark;
-    --surface-1:      #12241a;
-    --surface-2:      #16301f;
-    --page:           #08130d;
-    --text-primary:   #f2f8ee;
-    --text-secondary: #b9ccb4;
-    --text-muted:     #83967f;
-    --grid:           #223a29;
-    --baseline:       #35513e;
-    --border:         rgba(168,217,64,0.14);
+  return null;
+}
 
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --series-4: #c98500;
-    --series-5: #d55181;
-    --series-6: #008300;
-    --series-7: #9085e9;
-    --series-8: #e66767;
+function appendLog(userId, role, event, details) {
+  getLogsSheet().appendRow([new Date(), userId || "", role || "", event || "", details || ""]);
+}
 
-    --brand-dark: #08130d;
-    --brand-mid:  #2d7a4f;
-    --brand-lime: #a8d940;
-    --brand-1: #08130d;
-    --brand-2: #2d7a4f;
-  }
+function putSession(token, payload) {
+  CacheService.getScriptCache().put(token, JSON.stringify(payload), SESSION_TTL_SECONDS);
+}
+function getSession(token) {
+  const raw = CacheService.getScriptCache().get(token);
+  return raw ? JSON.parse(raw) : null;
+}
+function removeSession(token) {
+  CacheService.getScriptCache().remove(token);
+}
 
-  * { box-sizing: border-box; }
-  html, body {
-    margin: 0; padding: 0;
-    background: var(--page);
-    color: var(--text-primary);
-    font-family: 'Poppins', system-ui, -apple-system, "Segoe UI", sans-serif;
-  }
-  body { padding-bottom: 30px; }
-  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+function jsonOut(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
 
-  /* ---- themed header band ---- */
-  .hero {
-    background: radial-gradient(circle at 85% 20%, rgba(168,217,64,0.16) 0, transparent 45%),
-                linear-gradient(160deg, var(--brand-dark), #133a24 65%, var(--brand-mid));
-    position: relative;
-    overflow: hidden;
-    padding: 30px 0 40px;
-    margin-bottom: -20px;
-  }
-  .hero::before {
-    content: "";
-    position: absolute; inset: 0;
-    background-image:
-      radial-gradient(circle at 12% 30%, rgba(168,217,64,0.10) 0, transparent 55%),
-      radial-gradient(circle at 92% 85%, rgba(168,217,64,0.08) 0, transparent 50%);
-    pointer-events: none;
-  }
-  .hero .wrap { position: relative; }
-  header.top {
-    display: flex; flex-direction: column; align-items: center; text-align: center;
-    gap: 14px;
-  }
-  .title-block { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-  .drop-icon { width: 36px; height: 36px; flex-shrink: 0; }
-  .live-badge {
-    display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 600;
-    letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand-lime);
-    background: rgba(168,217,64,0.12); border: 1px solid rgba(168,217,64,0.35);
-    border-radius: 999px; padding: 4px 11px;
-  }
-  .live-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand-lime); box-shadow: 0 0 0 3px rgba(168,217,64,0.25); }
-  header.top h1 { font-family: 'Playfair Display', serif; font-weight: 800; font-size: 26px; margin: 0; letter-spacing: -0.01em; color: #fff; }
-  header.top p.sub { margin: 0; color: rgba(238,247,232,0.78); font-size: 13px; }
-  .top-actions { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 12px; color: rgba(238,247,232,0.85); }
-  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--brand-lime); display: inline-block; margin-right: 6px; box-shadow: 0 0 0 3px rgba(168,217,64,0.25); }
-  button.refresh {
-    font: inherit; font-size: 12px; font-weight: 700; color: var(--brand-dark);
-    background: linear-gradient(135deg, #cbe97a, var(--brand-lime)); border: none; border-radius: 999px;
-    padding: 8px 16px; cursor: pointer; box-shadow: 0 2px 10px rgba(168,217,64,0.25);
-  }
-  button.refresh:hover { filter: brightness(1.05); }
-
-  .content { padding-top: 34px; }
-
-  .banner {
-    display: none; border: 1px solid var(--status-critical); background: color-mix(in srgb, var(--status-critical) 10%, var(--surface-1));
-    border-radius: 10px; padding: 14px 16px; margin-bottom: 18px; font-size: 13px; line-height: 1.5; color: var(--text-primary);
-  }
-  .banner.show { display: block; }
-  .banner code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border); }
-
-  .kpi-row {
-    display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 18px;
-  }
-  .kpi {
-    background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px;
-    padding: 14px 16px 14px 14px; border-left: 3px solid var(--accent, var(--brand-mid));
-    box-shadow: 0 2px 8px rgba(13,40,24,0.05);
-  }
-  .kpi .label { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; font-weight: 500; }
-  .kpi .value { font-size: 27px; font-weight: 700; line-height: 1; }
-  .kpi .value .unit { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-left: 3px; }
-
-  .charts-row { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 18px; }
-  .card {
-    background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px; padding: 18px;
-    position: relative; box-shadow: 0 2px 8px rgba(13,40,24,0.05);
-  }
-  .card h3 { font-family: 'Playfair Display', serif; font-size: 17px; margin: 0 0 2px; font-weight: 700; }
-  .card p.hint { margin: 0 0 12px; font-size: 12px; color: var(--text-muted); }
-  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: var(--text-secondary); }
-  .legend .item { display: flex; align-items: center; gap: 6px; }
-  .legend .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-
-  .filters { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-  .filters select, .filters input {
-    font: inherit; font-size: 13px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--border);
-    background: var(--surface-2); color: var(--text-primary);
-  }
-  .filters select:focus, .filters input:focus { outline: none; border-color: var(--brand-mid); }
-  .filters .count-note { font-size: 12px; color: var(--text-muted); margin-left: auto; }
-
-  table.log { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-  table.log th, table.log td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
-  table.log th { color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.03em; }
-  table.log td.num { font-variant-numeric: tabular-nums; text-align: right; }
-  table.log tbody tr:hover { background: var(--surface-2); }
-  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; }
-  .badge .dot { width: 6px; height: 6px; border-radius: 50%; }
-  .badge.good { color: var(--status-good); background: color-mix(in srgb, var(--status-good) 14%, transparent); }
-  .badge.good .dot { background: var(--status-good); }
-  .badge.warning { color: #8a6200; background: color-mix(in srgb, var(--status-warning) 26%, transparent); }
-  .badge.warning .dot { background: var(--status-warning); }
-  .badge.critical { color: var(--status-critical); background: color-mix(in srgb, var(--status-critical) 14%, transparent); }
-  .badge.critical .dot { background: var(--status-critical); }
-  .badge.pending { color: var(--text-secondary); background: color-mix(in srgb, var(--status-pending) 16%, transparent); }
-  .badge.pending .dot { background: var(--status-pending); }
-  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-1); padding: 4px; }
-
-  .tooltip {
-    position: absolute; pointer-events: none; background: var(--surface-2); border: 1px solid var(--border);
-    border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-    opacity: 0; transition: opacity 0.08s; z-index: 20; white-space: nowrap;
-  }
-  .tooltip.show { opacity: 1; }
-  .tooltip .t-title { font-weight: 650; margin-bottom: 3px; }
-  .tooltip .t-row { display: flex; align-items: center; gap: 6px; }
-  .tooltip .t-swatch { width: 8px; height: 8px; border-radius: 2px; }
-
-  .empty-state { text-align: center; padding: 40px 10px; color: var(--text-muted); font-size: 13px; }
-
-  footer { text-align: center; color: var(--text-muted); font-size: 11.5px; margin: 22px 0 6px; }
-  footer a { color: var(--brand-mid); font-weight: 600; text-decoration: none; }
-  footer a:hover { text-decoration: underline; }
-
-  @media (max-width: 900px) {
-    .kpi-row { grid-template-columns: repeat(2, 1fr); }
-    .charts-row { grid-template-columns: 1fr; }
-  }
-
-  #appRoot.hidden { display: none; }
-
-  .login-overlay {
-    position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
-    padding: 20px;
-    background: radial-gradient(circle at 85% 15%, rgba(168,217,64,0.14) 0, transparent 45%),
-                linear-gradient(160deg, var(--brand-dark), #133a24 65%, var(--brand-mid));
-  }
-  .login-overlay.hidden { display: none; }
-  .login-card {
-    width: 100%; max-width: 360px; background: var(--surface-2); border-radius: 18px;
-    padding: 30px 28px; box-shadow: 0 10px 40px rgba(0,0,0,0.35); text-align: center;
-  }
-  .login-card .drop-icon { width: 40px; height: 40px; margin-bottom: 8px; }
-  .login-card h2 { font-family: 'Playfair Display', serif; font-size: 20px; margin: 0 0 4px; color: var(--text-primary); }
-  .login-card p.sub { margin: 0 0 20px; font-size: 12.5px; color: var(--text-muted); }
-  .login-field { text-align: left; margin-bottom: 14px; }
-  .login-field label { display: block; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.03em; }
-  .login-field input {
-    width: 100%; font: inherit; font-size: 14px; padding: 10px 12px; border-radius: 10px;
-    border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary);
-  }
-  .login-field input:focus { outline: none; border-color: var(--brand-mid); }
-  .login-error {
-    display: none; background: color-mix(in srgb, var(--status-critical) 12%, transparent);
-    color: var(--status-critical); font-size: 12.5px; border-radius: 8px; padding: 8px 10px; margin-bottom: 14px;
-  }
-  .login-error.show { display: block; }
-  button.login-submit {
-    width: 100%; font: inherit; font-size: 14px; font-weight: 700; color: var(--brand-dark);
-    background: linear-gradient(135deg, #cbe97a, var(--brand-lime)); border: none; border-radius: 999px;
-    padding: 11px; cursor: pointer; box-shadow: 0 2px 10px rgba(168,217,64,0.25);
-  }
-  button.login-submit:hover { filter: brightness(1.05); }
-  button.login-submit:disabled { opacity: 0.6; cursor: default; }
-
-  .user-chip { display: flex; align-items: center; gap: 8px; }
-  .user-chip .name { font-weight: 600; color: #fff; }
-  .user-chip .role {
-    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
-    background: rgba(168,217,64,0.18); color: var(--brand-lime); border-radius: 999px; padding: 2px 8px;
-  }
-  button.logout-link {
-    font: inherit; font-size: 12px; color: rgba(238,247,232,0.85); background: none; border: none;
-    text-decoration: underline; cursor: pointer; padding: 0;
-  }
-
-  .log-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .log-table th, .log-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
-  .log-table th { color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 10px; }
-</style>
-</head>
-<body>
-
-<div class="login-overlay" id="loginOverlay">
-  <div class="login-card">
-    <svg class="drop-icon" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 4C12 4 5 13.2 5 17.5C5 21.6 8.13 24 12 24C15.87 24 19 21.6 19 17.5C19 13.2 12 4 12 4Z" fill="var(--brand-mid)"/>
-      <path d="M8.8 17.6C8.8 19.7 10.2 21 12 21" stroke="#fff" stroke-width="1.3" stroke-linecap="round" opacity="0.5"/>
-    </svg>
-    <h2>Central RO Dashboard</h2>
-    <p class="sub">Sign in with your staff ID to continue.</p>
-    <div class="login-error" id="loginError"></div>
-    <form id="loginForm">
-      <div class="login-field">
-        <label for="loginId">Staff ID</label>
-        <input id="loginId" type="text" autocomplete="username" placeholder="e.g. PW-014" required>
-      </div>
-      <div class="login-field">
-        <label for="loginPassword">Password</label>
-        <input id="loginPassword" type="password" autocomplete="current-password" required>
-      </div>
-      <button type="submit" class="login-submit" id="loginSubmit">Sign in</button>
-    </form>
-  </div>
-</div>
-
-<div id="appRoot" class="hidden">
-<div class="hero">
-  <div class="wrap">
-    <header class="top">
-      <div class="title-block">
-        <svg class="drop-icon" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 4C12 4 5 13.2 5 17.5C5 21.6 8.13 24 12 24C15.87 24 19 21.6 19 17.5C19 13.2 12 4 12 4Z" fill="var(--brand-lime)"/>
-          <path d="M8.8 17.6C8.8 19.7 10.2 21 12 21" stroke="var(--brand-dark)" stroke-width="1.3" stroke-linecap="round" opacity="0.45"/>
-          <path d="M9 4.5C9.6 2.8 11.2 1.7 12.6 2C11.6 3.2 11.3 4.2 11.4 5.4" fill="var(--brand-lime)" opacity="0.85"/>
-          <path d="M15 3.6C15.9 2.2 17.6 1.5 19 2.1C17.8 3.1 17.3 4.1 17.2 5.3" fill="var(--brand-lime)" opacity="0.6"/>
-        </svg>
-        <div class="live-badge"><span class="dot"></span>Live dashboard</div>
-        <h1>Central RO — Service &amp; Dosing Dashboard</h1>
-        <p class="sub">Installation &amp; chemical dosing service schedule, live from Google Sheets.</p>
-      </div>
-      <div class="top-actions">
-        <span><span class="live-dot"></span><span id="updatedAt">Loading…</span></span>
-        <button class="refresh" id="refreshBtn">Refresh</button>
-      </div>
-      <div class="user-chip">
-        <span class="name" id="userName"></span>
-        <span class="role" id="userRole"></span>
-        <button class="logout-link" id="logoutBtn">Log out</button>
-      </div>
-    </header>
-  </div>
-</div>
-
-<div class="wrap content">
-
-  <div class="banner" id="errorBanner">
-    <strong>Can't load the sheet.</strong>
-    This dashboard reads the Google Sheet directly in the browser, which requires the sheet to be shared as
-    <strong>"Anyone with the link — Viewer"</strong>. Open the sheet → <em>Share</em> → change access to
-    "Anyone with the link", then click Refresh. (The sheet ID is read from <code>SHEET_ID</code> at the top of the script —
-    update it if this dashboard should point at a different sheet, and <code>GID</code> if the data isn't on the first tab.)
-  </div>
-
-  <section class="kpi-row" id="kpiRow"></section>
-
-  <section class="charts-row">
-    <div class="card">
-      <h3>Dosing Service Status by Apartment</h3>
-      <p class="hint">Days until next dosing service — negative means overdue</p>
-      <div id="statusChart"></div>
-      <div class="legend" id="statusLegend"></div>
-    </div>
-  </section>
-
-  <section class="card" style="margin-bottom: 18px;">
-    <h3>Apartment Log</h3>
-    <p class="hint">Sorted by urgency — most overdue first</p>
-    <div class="filters">
-      <select id="statusFilter">
-        <option value="">All statuses</option>
-        <option value="critical">Overdue</option>
-        <option value="warning">Due soon (≤7 days)</option>
-        <option value="good">On schedule</option>
-        <option value="pending">Not yet scheduled</option>
-      </select>
-      <input id="searchBox" type="text" placeholder="Search apartment name…">
-      <span class="count-note" id="rowCount"></span>
-    </div>
-    <div class="table-scroll">
-      <table class="log" id="logTable">
-        <thead>
-          <tr>
-            <th>#</th><th>Apartment</th><th>Installed</th>
-            <th>Last dosing service</th><th>Next service</th><th>Days left</th><th>Status</th>
-          </tr>
-        </thead>
-        <tbody id="logBody"></tbody>
-      </table>
-      <div class="empty-state" id="emptyState" style="display:none;">No matching rows.</div>
-    </div>
-  </section>
-
-  <section class="card" id="activityLogCard" style="display:none; margin-bottom: 18px;">
-    <h3>Activity Log</h3>
-    <p class="hint">Admin only — recent logins and actions</p>
-    <div class="table-scroll">
-      <table class="log-table" id="activityLogTable">
-        <thead><tr><th>Time</th><th>Staff ID</th><th>Role</th><th>Event</th><th>Details</th></tr></thead>
-        <tbody id="activityLogBody"></tbody>
-      </table>
-    </div>
-  </section>
-
-  <footer>
-    Data source: <a href="https://docs.google.com/spreadsheets/d/1jXOMXar7PR_qUjTqx5jRyRXmUpgQOadvGjssPGW--t4/edit" target="_blank" rel="noopener">Google Sheet</a> · Central RO Service &amp; Dosing
-  </footer>
-</div>
-</div>
-
-<div class="tooltip" id="tooltip"></div>
-
-<script>
-const SHEET_ID = "1jXOMXar7PR_qUjTqx5jRyRXmUpgQOadvGjssPGW--t4";
-const GID = "0";
-
-// Paste the Apps Script Web App /exec URL here once deployed (see Code.gs setup steps).
-const APPS_SCRIPT_URL = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
-
-const auth = { token: null, id: null, name: null, role: null };
-
-function loadSession() {
+function doPost(e) {
+  let body;
   try {
-    const raw = sessionStorage.getItem("roDashboardSession");
-    if (!raw) return false;
-    const s = JSON.parse(raw);
-    auth.token = s.token; auth.id = s.id; auth.name = s.name; auth.role = s.role;
-    return true;
-  } catch { return false; }
-}
-function saveSession() {
-  sessionStorage.setItem("roDashboardSession", JSON.stringify(auth));
-}
-function clearSession() {
-  sessionStorage.removeItem("roDashboardSession");
-  auth.token = null; auth.id = null; auth.name = null; auth.role = null;
+    body = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return jsonOut({ ok: false, error: "Bad request" });
+  }
+
+  const action = body.action;
+
+  if (action === "login") {
+    const user = findUserRow(body.id);
+    if (!user || user.active === false || user.active === "FALSE") {
+      return jsonOut({ ok: false, error: "Invalid ID or password" });
+    }
+    if (hashPassword(String(body.password || "")) !== user.hash) {
+      return jsonOut({ ok: false, error: "Invalid ID or password" });
+    }
+    const token = Utilities.getUuid();
+    putSession(token, { id: user.id, name: user.name, role: user.role });
+    appendLog(user.id, user.role, "login", "");
+    return jsonOut({ ok: true, token, name: user.name, role: user.role });
+  }
+
+  if (action === "logout") {
+    const session = getSession(body.token);
+    if (session) {
+      appendLog(session.id, session.role, "logout", "");
+      removeSession(body.token);
+    }
+    return jsonOut({ ok: true });
+  }
+
+  if (action === "log") {
+    const session = getSession(body.token);
+    if (!session) return jsonOut({ ok: false, error: "Session expired" });
+    appendLog(session.id, session.role, body.event || "event", body.details || "");
+    return jsonOut({ ok: true });
+  }
+
+  if (action === "listLogs") {
+    const session = getSession(body.token);
+    if (!session || String(session.role).toLowerCase() !== "admin") {
+      return jsonOut({ ok: false, error: "Not authorized" });
+    }
+    const data = getLogsSheet().getDataRange().getValues();
+    const rows = data.slice(1).map(r => ({
+      timestamp: r[0] instanceof Date ? r[0].toISOString() : String(r[0]),
+      userId: r[1], role: r[2], event: r[3], details: r[4]
+    }));
+    rows.reverse();
+    const limit = Number(body.limit) || 100;
+    return jsonOut({ ok: true, logs: rows.slice(0, limit) });
+  }
+
+  return jsonOut({ ok: false, error: "Unknown action" });
 }
 
-async function callBackend(payload) {
-  const res = await fetch(APPS_SCRIPT_URL, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" }, // avoids a CORS preflight against Apps Script
-    body: JSON.stringify(payload)
-  });
-  return res.json();
+/**
+ * Adds a menu to the private sheet's UI so the admin (non-engineer) can
+ * create/update accounts without ever touching code or the raw password hash.
+ */
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu("RO Dashboard Access")
+    .addItem("Add / update user", "addOrUpdateUserPrompt")
+    .addItem("Deactivate user", "deactivateUserPrompt")
+    .addToUi();
 }
 
-function logEvent(event, details) {
-  if (!auth.token || APPS_SCRIPT_URL.includes("PASTE_YOUR")) return;
-  callBackend({ action: "log", token: auth.token, event, details: details || "" }).catch(() => {});
-}
+function addOrUpdateUserPrompt() {
+  const ui = SpreadsheetApp.getUi();
+  const idResp = ui.prompt("Add / update user", "Staff ID (e.g. PW-014):", ui.ButtonSet.OK_CANCEL);
+  if (idResp.getSelectedButton() !== ui.Button.OK || !idResp.getResponseText().trim()) return;
+  const id = idResp.getResponseText().trim();
 
-function showApp() {
-  document.getElementById("loginOverlay").classList.add("hidden");
-  document.getElementById("appRoot").classList.remove("hidden");
-  document.getElementById("userName").textContent = auth.name || auth.id;
-  document.getElementById("userRole").textContent = auth.role;
-  document.getElementById("activityLogCard").style.display = String(auth.role).toLowerCase() === "admin" ? "block" : "none";
-  load();
-  if (String(auth.role).toLowerCase() === "admin") loadActivityLog();
-}
-function showLogin() {
-  document.getElementById("appRoot").classList.add("hidden");
-  document.getElementById("loginOverlay").classList.remove("hidden");
-}
+  const nameResp = ui.prompt("Add / update user", "Full name:", ui.ButtonSet.OK_CANCEL);
+  if (nameResp.getSelectedButton() !== ui.Button.OK) return;
+  const name = nameResp.getResponseText().trim();
 
-async function loadActivityLog() {
-  try {
-    const res = await callBackend({ action: "listLogs", token: auth.token, limit: 100 });
-    if (!res.ok) return;
-    document.getElementById("activityLogBody").innerHTML = res.logs.map(l => `<tr>
-      <td>${new Date(l.timestamp).toLocaleString("en-IN")}</td>
-      <td>${l.userId}</td><td>${l.role}</td><td>${l.event}</td><td>${l.details || ""}</td>
-    </tr>`).join("");
-  } catch (err) { console.error(err); }
-}
-
-document.getElementById("loginForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const id = document.getElementById("loginId").value.trim();
-  const password = document.getElementById("loginPassword").value;
-  const errorBox = document.getElementById("loginError");
-  const submitBtn = document.getElementById("loginSubmit");
-  errorBox.classList.remove("show");
-
-  if (APPS_SCRIPT_URL.includes("PASTE_YOUR")) {
-    errorBox.textContent = "Backend not configured yet — set APPS_SCRIPT_URL in the script.";
-    errorBox.classList.add("show");
+  const roleResp = ui.prompt("Add / update user", "Role — type exactly one of: Admin, Technician, Viewer", ui.ButtonSet.OK_CANCEL);
+  if (roleResp.getSelectedButton() !== ui.Button.OK) return;
+  const role = roleResp.getResponseText().trim();
+  if (!["Admin", "Technician", "Viewer"].includes(role)) {
+    ui.alert("Role must be exactly: Admin, Technician, or Viewer.");
     return;
   }
 
-  submitBtn.disabled = true; submitBtn.textContent = "Signing in…";
-  try {
-    const res = await callBackend({ action: "login", id, password });
-    if (!res.ok) {
-      errorBox.textContent = res.error || "Invalid ID or password";
-      errorBox.classList.add("show");
-      return;
-    }
-    auth.token = res.token; auth.id = id; auth.name = res.name; auth.role = res.role;
-    saveSession();
-    showApp();
-  } catch (err) {
-    errorBox.textContent = "Couldn't reach the login server. Try again.";
-    errorBox.classList.add("show");
-  } finally {
-    submitBtn.disabled = false; submitBtn.textContent = "Sign in";
-  }
-});
+  const pwResp = ui.prompt("Add / update user", "Password for this user:", ui.ButtonSet.OK_CANCEL);
+  if (pwResp.getSelectedButton() !== ui.Button.OK || !pwResp.getResponseText()) return;
+  const hash = hashPassword(pwResp.getResponseText());
 
-document.getElementById("logoutBtn").addEventListener("click", async () => {
-  try { await callBackend({ action: "logout", token: auth.token }); } catch {}
-  clearSession();
-  showLogin();
-});
-
-const COLUMN_SYNONYMS = {
-  serial:      ["serial no", "serial", "sno", "no"],
-  apartment:   ["apartment name", "apartment", "site", "site name", "customer"],
-  installed:   ["apt installed date", "installed date", "installation date"],
-  installedMonth: ["apt installed month", "installed month"],
-  lastService: ["last service date for dosing", "last service date", "last dosing date", "last service"],
-  nextService: ["next service date", "next dosing date", "next service"],
-  daysLeft:    ["days left", "days remaining"]
-};
-
-const state = { rows: [] };
-
-function norm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
-
-function buildHeaderMap(headers) {
-  const map = {};
-  const normed = headers.map(norm);
-  for (const [key, syns] of Object.entries(COLUMN_SYNONYMS)) {
-    const synsNormed = syns.map(norm);
-    let idx = normed.findIndex(h => synsNormed.includes(h));
-    if (idx === -1) idx = normed.findIndex(h => synsNormed.some(s => h.includes(s)));
-    map[key] = idx;
-  }
-  return map;
-}
-
-function gvizDateToJs(v) {
-  if (v == null) return null;
-  if (v instanceof Date) return v;
-  if (typeof v === "string" && v.startsWith("Date(")) {
-    const parts = v.slice(5, -1).split(",").map(Number);
-    return new Date(parts[0], parts[1], parts[2]);
-  }
-  const d = new Date(v);
-  return isNaN(d.getTime()) ? null : d;
-}
-
-async function fetchSheet() {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${GID}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("Fetch failed: " + res.status);
-  const text = await res.text();
-  const jsonStr = text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1);
-  const parsed = JSON.parse(jsonStr);
-  const cols = parsed.table.cols.map(c => c.label || c.id || "");
-  const headerMap = buildHeaderMap(cols);
-
-  const rows = parsed.table.rows.map(r => {
-    const cells = r.c.map(c => (c ? (c.v !== undefined ? c.v : c.f) : null));
-    const get = key => {
-      const idx = headerMap[key];
-      return idx == null || idx < 0 ? null : cells[idx];
-    };
-    const daysLeftRaw = get("daysLeft");
-    return {
-      serial: get("serial"),
-      apartment: get("apartment") || "—",
-      installed: gvizDateToJs(get("installed")),
-      lastService: gvizDateToJs(get("lastService")),
-      nextService: gvizDateToJs(get("nextService")),
-      daysLeft: (daysLeftRaw === null || daysLeftRaw === "") ? null : Number(daysLeftRaw)
-    };
-  }).filter(r => r.apartment !== "—" || r.installed);
-
-  return rows;
-}
-
-function computeStatus(row) {
-  if (!row.nextService && row.daysLeft == null) return "pending";
-  if (row.daysLeft == null) return "pending";
-  if (row.daysLeft < 0) return "critical";
-  if (row.daysLeft <= 7) return "warning";
-  return "good";
-}
-
-function fmtDate(d) {
-  if (!d) return "—";
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-}
-
-function renderKpis(rows) {
-  const counts = { good: 0, warning: 0, critical: 0, pending: 0 };
-  rows.forEach(r => counts[computeStatus(r)]++);
-  const kpis = [
-    { label: "Total apartments", value: rows.length, unit: "", accent: "var(--brand-1)" },
-    { label: "Overdue", value: counts.critical, unit: "", accent: "var(--status-critical)" },
-    { label: "Due within 7 days", value: counts.warning, unit: "", accent: "var(--status-warning)" },
-    { label: "On schedule", value: counts.good, unit: "", accent: "var(--status-good)" },
-    { label: "Not yet scheduled", value: counts.pending, unit: "", accent: "var(--status-pending)" }
-  ];
-  document.getElementById("kpiRow").innerHTML = kpis.map(k =>
-    `<div class="kpi" style="--accent:${k.accent}"><div class="label">${k.label}</div><div class="value">${k.value}<span class="unit">${k.unit}</span></div></div>`
-  ).join("");
-}
-
-const STATUS_DEFS = [
-  { key: "critical", label: "Overdue", color: "var(--status-critical)" },
-  { key: "warning", label: "Due soon", color: "var(--status-warning)" },
-  { key: "good", label: "On schedule", color: "var(--status-good)" },
-  { key: "pending", label: "Not yet scheduled", color: "var(--status-pending)" }
-];
-
-function renderStatusChart(rows) {
-  const el = document.getElementById("statusChart");
-  const scheduled = rows.filter(r => r.daysLeft != null).sort((a, b) => a.daysLeft - b.daysLeft);
-  if (!scheduled.length) { el.innerHTML = '<div class="empty-state">No scheduled services yet.</div>'; document.getElementById("statusLegend").innerHTML = ""; return; }
-
-  const rowH = 24, PAD_L = 172, PAD_R = 46, W = el.clientWidth || 600;
-  const H = scheduled.length * rowH + 10;
-  const maxAbs = Math.max(...scheduled.map(r => Math.abs(r.daysLeft)), 7);
-  const zeroX = PAD_L + (W - PAD_L - PAD_R) * (maxAbs / (2 * maxAbs));
-  const scaleW = (W - PAD_L - PAD_R) / (2 * maxAbs);
-
-  const bars = scheduled.map((r, i) => {
-    const y = i * rowH + 5;
-    const status = computeStatus(r);
-    const color = STATUS_DEFS.find(s => s.key === status).color;
-    const barW = Math.max(Math.abs(r.daysLeft) * scaleW, 2);
-    const x = r.daysLeft >= 0 ? zeroX : zeroX - barW;
-    return `<text x="${PAD_L - 8}" y="${y + 12}" text-anchor="end" font-size="10" font-family="Poppins, system-ui, sans-serif" fill="var(--text-secondary)">${r.apartment}</text>
-      <rect x="${x}" y="${y}" width="${barW}" height="14" rx="3" fill="${color}" data-name="${r.apartment}" data-days="${r.daysLeft}"/>`;
-  }).join("");
-
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">
-    <line x1="${zeroX}" x2="${zeroX}" y1="0" y2="${H}" stroke="var(--baseline)" stroke-width="1"/>
-    ${bars}
-  </svg>`;
-
-  document.getElementById("statusLegend").innerHTML = STATUS_DEFS.map(s =>
-    `<span class="item"><span class="swatch" style="background:${s.color}"></span>${s.label}</span>`
-  ).join("");
-
-  const tooltip = document.getElementById("tooltip");
-  el.querySelectorAll("rect[data-name]").forEach(rect => {
-    rect.addEventListener("mousemove", e => {
-      const d = Number(rect.dataset.days);
-      tooltip.innerHTML = `<div class="t-title">${rect.dataset.name}</div><div>${d < 0 ? Math.abs(d) + " days overdue" : d + " days left"}</div>`;
-      tooltip.style.left = (e.clientX + 14) + "px";
-      tooltip.style.top = (e.clientY - 10) + "px";
-      tooltip.classList.add("show");
-    });
-    rect.addEventListener("mouseleave", () => tooltip.classList.remove("show"));
-  });
-}
-
-function renderTable(rows) {
-  const statusFilter = document.getElementById("statusFilter").value;
-  const search = norm(document.getElementById("searchBox").value);
-
-  let filtered = rows.filter(r => {
-    if (statusFilter && computeStatus(r) !== statusFilter) return false;
-    if (search && !norm(r.apartment).includes(search)) return false;
-    return true;
-  });
-  filtered = filtered.slice().sort((a, b) => {
-    const da = a.daysLeft == null ? Infinity : a.daysLeft;
-    const db = b.daysLeft == null ? Infinity : b.daysLeft;
-    return da - db;
-  });
-
-  document.getElementById("rowCount").textContent = `${filtered.length} of ${rows.length} apartments`;
-  document.getElementById("emptyState").style.display = filtered.length ? "none" : "block";
-
-  const statusLabel = { good: "On schedule", warning: "Due soon", critical: "Overdue", pending: "Not yet scheduled" };
-  document.getElementById("logBody").innerHTML = filtered.map((r, i) => {
-    const st = computeStatus(r);
-    return `<tr>
-      <td class="num">${i + 1}</td>
-      <td>${r.apartment}</td>
-      <td>${fmtDate(r.installed)}</td>
-      <td>${fmtDate(r.lastService)}</td>
-      <td>${fmtDate(r.nextService)}</td>
-      <td class="num">${r.daysLeft ?? "—"}</td>
-      <td><span class="badge ${st}"><span class="dot"></span>${statusLabel[st]}</span></td>
-    </tr>`;
-  }).join("");
-}
-
-async function load() {
-  document.getElementById("errorBanner").classList.remove("show");
-  document.getElementById("updatedAt").textContent = "Loading…";
-  try {
-    const rows = await fetchSheet();
-    state.rows = rows;
-    renderKpis(rows);
-    renderStatusChart(rows);
-    renderTable(rows);
-    document.getElementById("updatedAt").textContent = "Updated " + new Date().toLocaleTimeString();
-    logEvent("view_dashboard", `${rows.length} apartments`);
-  } catch (err) {
-    console.error(err);
-    document.getElementById("errorBanner").classList.add("show");
-    document.getElementById("updatedAt").textContent = "Not connected";
+  const sheet = getUsersSheet();
+  const existing = findUserRow(id);
+  if (existing) {
+    sheet.getRange(existing.rowIndex, 1, 1, 6).setValues([[id, name, role, hash, true, existing.rowIndex ? sheet.getRange(existing.rowIndex, 6).getValue() : new Date()]]);
+    ui.alert(`Updated user ${id}.`);
+  } else {
+    sheet.appendRow([id, name, role, hash, true, new Date()]);
+    ui.alert(`Added user ${id} as ${role}.`);
   }
 }
 
-document.getElementById("refreshBtn").addEventListener("click", load);
-document.getElementById("statusFilter").addEventListener("change", () => renderTable(state.rows));
-document.getElementById("searchBox").addEventListener("input", () => renderTable(state.rows));
-
-if (loadSession()) {
-  showApp();
-} else {
-  showLogin();
+function deactivateUserPrompt() {
+  const ui = SpreadsheetApp.getUi();
+  const idResp = ui.prompt("Deactivate user", "Staff ID to deactivate:", ui.ButtonSet.OK_CANCEL);
+  if (idResp.getSelectedButton() !== ui.Button.OK) return;
+  const user = findUserRow(idResp.getResponseText().trim());
+  if (!user) { ui.alert("No such user."); return; }
+  getUsersSheet().getRange(user.rowIndex, 5).setValue(false);
+  ui.alert(`Deactivated ${user.id}.`);
 }
-</script>
-</body>
-</html>
