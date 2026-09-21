@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Central RO — Service &amp; Dosing Dashboard</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --surface-2:      #ffffff;
+    --page:           #eef5f8;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --grid:           #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+
+    --series-1: #2a78d6; /* blue   */
+    --series-2: #eb6834; /* orange */
+    --series-3: #1baf7a; /* aqua   */
+    --series-4: #eda100; /* yellow */
+    --series-5: #e87ba4; /* magenta*/
+    --series-6: #008300; /* green  */
+    --series-7: #4a3aa7; /* violet */
+    --series-8: #e34948; /* red    */
+
+    --status-good:     #0ca30c;
+    --status-warning:  #fab219;
+    --status-serious:  #ec835a;
+    --status-critical: #d03b3b;
+    --status-pending:  #898781;
+
+    --brand-1: #0e6ba8; /* deep water blue */
+    --brand-2: #1baf9a; /* teal */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --surface-2:      #202020;
+      --page:           #0c1416;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --grid:           #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+      --series-5: #d55181;
+      --series-6: #008300;
+      --series-7: #9085e9;
+      --series-8: #e66767;
+
+      --brand-1: #1c5cab;
+      --brand-2: #199e70;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --surface-2:      #202020;
+    --page:           #0c1416;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --grid:           #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+
+    --brand-1: #1c5cab;
+    --brand-2: #199e70;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  body { padding-bottom: 30px; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+
+  /* ---- themed header band ---- */
+  .hero {
+    background: linear-gradient(120deg, var(--brand-1), var(--brand-2));
+    background-size: 200% 200%;
+    position: relative;
+    overflow: hidden;
+    padding: 28px 0 34px;
+    margin-bottom: -20px;
+  }
+  .hero::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(circle at 12% 30%, rgba(255,255,255,0.14) 0, transparent 55%),
+      radial-gradient(circle at 85% 75%, rgba(255,255,255,0.10) 0, transparent 50%);
+    pointer-events: none;
+  }
+  .hero .wrap { position: relative; }
+  header.top {
+    display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+    gap: 12px;
+  }
+  .title-block { display: flex; align-items: center; gap: 12px; }
+  .drop-icon { width: 34px; height: 34px; flex-shrink: 0; }
+  header.top h1 { font-size: 22px; margin: 0 0 3px; letter-spacing: -0.01em; color: #fff; }
+  header.top p.sub { margin: 0; color: rgba(255,255,255,0.85); font-size: 13px; }
+  .top-actions { display: flex; align-items: center; gap: 10px; font-size: 12px; color: rgba(255,255,255,0.9); }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #6bffb0; display: inline-block; margin-right: 6px; box-shadow: 0 0 0 3px rgba(107,255,176,0.25); }
+  button.refresh {
+    font: inherit; font-size: 12px; font-weight: 600; color: var(--brand-1);
+    background: #fff; border: 1px solid rgba(255,255,255,0.5); border-radius: 8px;
+    padding: 6px 12px; cursor: pointer;
+  }
+  button.refresh:hover { background: #f0f7fb; }
+
+  .content { padding-top: 34px; }
+
+  .banner {
+    display: none; border: 1px solid var(--status-critical); background: color-mix(in srgb, var(--status-critical) 10%, var(--surface-1));
+    border-radius: 10px; padding: 14px 16px; margin-bottom: 18px; font-size: 13px; line-height: 1.5; color: var(--text-primary);
+  }
+  .banner.show { display: block; }
+  .banner code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border); }
+
+  .kpi-row {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 18px;
+  }
+  .kpi {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px 14px 14px; border-left: 3px solid var(--accent, var(--brand-1));
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .kpi .label { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+  .kpi .value { font-size: 26px; font-weight: 650; line-height: 1; }
+  .kpi .value .unit { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-left: 3px; }
+
+  .charts-row { display: grid; grid-template-columns: 1.3fr 1fr; gap: 12px; margin-bottom: 18px; }
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+    position: relative; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card h3 { font-size: 14px; margin: 0 0 2px; font-weight: 650; }
+  .card p.hint { margin: 0 0 12px; font-size: 12px; color: var(--text-muted); }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: var(--text-secondary); }
+  .legend .item { display: flex; align-items: center; gap: 6px; }
+  .legend .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  .filters { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+  .filters select, .filters input {
+    font: inherit; font-size: 13px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text-primary);
+  }
+  .filters .count-note { font-size: 12px; color: var(--text-muted); margin-left: auto; }
+
+  table.log { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.log th, table.log td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  table.log th { color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.03em; }
+  table.log td.num { font-variant-numeric: tabular-nums; text-align: right; }
+  table.log tbody tr:hover { background: var(--surface-2); }
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .badge.good { color: var(--status-good); background: color-mix(in srgb, var(--status-good) 14%, transparent); }
+  .badge.good .dot { background: var(--status-good); }
+  .badge.warning { color: #8a6200; background: color-mix(in srgb, var(--status-warning) 26%, transparent); }
+  .badge.warning .dot { background: var(--status-warning); }
+  .badge.critical { color: var(--status-critical); background: color-mix(in srgb, var(--status-critical) 14%, transparent); }
+  .badge.critical .dot { background: var(--status-critical); }
+  .badge.pending { color: var(--text-secondary); background: color-mix(in srgb, var(--status-pending) 16%, transparent); }
+  .badge.pending .dot { background: var(--status-pending); }
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); padding: 4px; }
+
+  .tooltip {
+    position: absolute; pointer-events: none; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    opacity: 0; transition: opacity 0.08s; z-index: 20; white-space: nowrap;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip .t-title { font-weight: 650; margin-bottom: 3px; }
+  .tooltip .t-row { display: flex; align-items: center; gap: 6px; }
+  .tooltip .t-swatch { width: 8px; height: 8px; border-radius: 2px; }
+
+  .empty-state { text-align: center; padding: 40px 10px; color: var(--text-muted); font-size: 13px; }
+
+  footer { text-align: center; color: var(--text-muted); font-size: 11.5px; margin: 22px 0 6px; }
+  footer a { color: inherit; }
+
+  @media (max-width: 900px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .charts-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap">
+    <header class="top">
+      <div class="title-block">
+        <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2C12 2 5 11.2 5 15.5C5 19.6 8.13 22 12 22C15.87 22 19 19.6 19 15.5C19 11.2 12 2 12 2Z" fill="rgba(255,255,255,0.92)"/>
+          <path d="M8.6 15.8C8.6 17.9 10.1 19.3 12 19.3" stroke="var(--brand-1)" stroke-width="1.4" stroke-linecap="round" opacity="0.55"/>
+        </svg>
+        <div>
+          <h1>Central RO — Service &amp; Dosing Dashboard</h1>
+          <p class="sub">Installation &amp; chemical dosing service schedule, live from Google Sheets.</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span><span class="live-dot"></span><span id="updatedAt">Loading…</span></span>
+        <button class="refresh" id="refreshBtn">Refresh</button>
+      </div>
+    </header>
+  </div>
+</div>
+
+<div class="wrap content">
+
+  <div class="banner" id="errorBanner">
+    <strong>Can't load the sheet.</strong>
+    This dashboard reads the Google Sheet directly in the browser, which requires the sheet to be shared as
+    <strong>"Anyone with the link — Viewer"</strong>. Open the sheet → <em>Share</em> → change access to
+    "Anyone with the link", then click Refresh. (The sheet ID is read from <code>SHEET_ID</code> at the top of the script —
+    update it if this dashboard should point at a different sheet, and <code>GID</code> if the data isn't on the first tab.)
+  </div>
+
+  <section class="kpi-row" id="kpiRow"></section>
+
+  <section class="charts-row">
+    <div class="card">
+      <h3>Dosing Service Status by Apartment</h3>
+      <p class="hint">Days until next dosing service — negative means overdue</p>
+      <div id="statusChart"></div>
+      <div class="legend" id="statusLegend"></div>
+    </div>
+    <div class="card">
+      <h3>Installations by Month</h3>
+      <p class="hint">Central RO units installed, by month</p>
+      <div id="installChart"></div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-bottom: 18px;">
+    <h3>Apartment Log</h3>
+    <p class="hint">Sorted by urgency — most overdue first</p>
+    <div class="filters">
+      <select id="statusFilter">
+        <option value="">All statuses</option>
+        <option value="critical">Overdue</option>
+        <option value="warning">Due soon (≤7 days)</option>
+        <option value="good">On schedule</option>
+        <option value="pending">Not yet scheduled</option>
+      </select>
+      <input id="searchBox" type="text" placeholder="Search apartment name…">
+      <span class="count-note" id="rowCount"></span>
+    </div>
+    <div class="table-scroll">
+      <table class="log" id="logTable">
+        <thead>
+          <tr>
+            <th>#</th><th>Apartment</th><th>Installed</th>
+            <th>Last dosing service</th><th>Next service</th><th>Days left</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="logBody"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState" style="display:none;">No matching rows.</div>
+    </div>
+  </section>
+
+  <footer>
+    Data source: <a href="https://docs.google.com/spreadsheets/d/1jXOMXar7PR_qUjTqx5jRyRXmUpgQOadvGjssPGW--t4/edit" target="_blank" rel="noopener">Google Sheet</a> · Central RO Service &amp; Dosing
+  </footer>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const SHEET_ID = "1jXOMXar7PR_qUjTqx5jRyRXmUpgQOadvGjssPGW--t4";
+const GID = "0";
+
+const COLUMN_SYNONYMS = {
+  serial:      ["serial no", "serial", "sno", "no"],
+  apartment:   ["apartment name", "apartment", "site", "site name", "customer"],
+  installed:   ["apt installed date", "installed date", "installation date"],
+  installedMonth: ["apt installed month", "installed month"],
+  lastService: ["last service date for dosing", "last service date", "last dosing date", "last service"],
+  nextService: ["next service date", "next dosing date", "next service"],
+  daysLeft:    ["days left", "days remaining"]
+};
+
+const state = { rows: [] };
+
+function norm(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+
+function buildHeaderMap(headers) {
+  const map = {};
+  const normed = headers.map(norm);
+  for (const [key, syns] of Object.entries(COLUMN_SYNONYMS)) {
+    const synsNormed = syns.map(norm);
+    let idx = normed.findIndex(h => synsNormed.includes(h));
+    if (idx === -1) idx = normed.findIndex(h => synsNormed.some(s => h.includes(s)));
+    map[key] = idx;
+  }
+  return map;
+}
+
+function gvizDateToJs(v) {
+  if (v == null) return null;
+  if (v instanceof Date) return v;
+  if (typeof v === "string" && v.startsWith("Date(")) {
+    const parts = v.slice(5, -1).split(",").map(Number);
+    return new Date(parts[0], parts[1], parts[2]);
+  }
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+async function fetchSheet() {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${GID}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Fetch failed: " + res.status);
+  const text = await res.text();
+  const jsonStr = text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1);
+  const parsed = JSON.parse(jsonStr);
+  const cols = parsed.table.cols.map(c => c.label || c.id || "");
+  const headerMap = buildHeaderMap(cols);
+
+  const rows = parsed.table.rows.map(r => {
+    const cells = r.c.map(c => (c ? (c.v !== undefined ? c.v : c.f) : null));
+    const get = key => {
+      const idx = headerMap[key];
+      return idx == null || idx < 0 ? null : cells[idx];
+    };
+    const daysLeftRaw = get("daysLeft");
+    return {
+      serial: get("serial"),
+      apartment: get("apartment") || "—",
+      installed: gvizDateToJs(get("installed")),
+      lastService: gvizDateToJs(get("lastService")),
+      nextService: gvizDateToJs(get("nextService")),
+      daysLeft: (daysLeftRaw === null || daysLeftRaw === "") ? null : Number(daysLeftRaw)
+    };
+  }).filter(r => r.apartment !== "—" || r.installed);
+
+  return rows;
+}
+
+function computeStatus(row) {
+  if (!row.nextService && row.daysLeft == null) return "pending";
+  if (row.daysLeft == null) return "pending";
+  if (row.daysLeft < 0) return "critical";
+  if (row.daysLeft <= 7) return "warning";
+  return "good";
+}
+
+function fmtDate(d) {
+  if (!d) return "—";
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function renderKpis(rows) {
+  const counts = { good: 0, warning: 0, critical: 0, pending: 0 };
+  rows.forEach(r => counts[computeStatus(r)]++);
+  const kpis = [
+    { label: "Total apartments", value: rows.length, unit: "", accent: "var(--brand-1)" },
+    { label: "Overdue", value: counts.critical, unit: "", accent: "var(--status-critical)" },
+    { label: "Due within 7 days", value: counts.warning, unit: "", accent: "var(--status-warning)" },
+    { label: "On schedule", value: counts.good, unit: "", accent: "var(--status-good)" },
+    { label: "Not yet scheduled", value: counts.pending, unit: "", accent: "var(--status-pending)" }
+  ];
+  document.getElementById("kpiRow").innerHTML = kpis.map(k =>
+    `<div class="kpi" style="--accent:${k.accent}"><div class="label">${k.label}</div><div class="value">${k.value}<span class="unit">${k.unit}</span></div></div>`
+  ).join("");
+}
+
+const STATUS_DEFS = [
+  { key: "critical", label: "Overdue", color: "var(--status-critical)" },
+  { key: "warning", label: "Due soon", color: "var(--status-warning)" },
+  { key: "good", label: "On schedule", color: "var(--status-good)" },
+  { key: "pending", label: "Not yet scheduled", color: "var(--status-pending)" }
+];
+
+function renderStatusChart(rows) {
+  const el = document.getElementById("statusChart");
+  const scheduled = rows.filter(r => r.daysLeft != null).sort((a, b) => a.daysLeft - b.daysLeft);
+  if (!scheduled.length) { el.innerHTML = '<div class="empty-state">No scheduled services yet.</div>'; document.getElementById("statusLegend").innerHTML = ""; return; }
+
+  const rowH = 24, PAD_L = 150, PAD_R = 46, W = el.clientWidth || 600;
+  const H = scheduled.length * rowH + 10;
+  const maxAbs = Math.max(...scheduled.map(r => Math.abs(r.daysLeft)), 7);
+  const zeroX = PAD_L + (W - PAD_L - PAD_R) * (maxAbs / (2 * maxAbs));
+  const scaleW = (W - PAD_L - PAD_R) / (2 * maxAbs);
+
+  const bars = scheduled.map((r, i) => {
+    const y = i * rowH + 5;
+    const status = computeStatus(r);
+    const color = STATUS_DEFS.find(s => s.key === status).color;
+    const barW = Math.max(Math.abs(r.daysLeft) * scaleW, 2);
+    const x = r.daysLeft >= 0 ? zeroX : zeroX - barW;
+    return `<text x="${PAD_L - 8}" y="${y + 12}" text-anchor="end" font-size="10.5" fill="var(--text-secondary)">${r.apartment}</text>
+      <rect x="${x}" y="${y}" width="${barW}" height="14" rx="3" fill="${color}" data-name="${r.apartment}" data-days="${r.daysLeft}"/>`;
+  }).join("");
+
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">
+    <line x1="${zeroX}" x2="${zeroX}" y1="0" y2="${H}" stroke="var(--baseline)" stroke-width="1"/>
+    ${bars}
+  </svg>`;
+
+  document.getElementById("statusLegend").innerHTML = STATUS_DEFS.map(s =>
+    `<span class="item"><span class="swatch" style="background:${s.color}"></span>${s.label}</span>`
+  ).join("");
+
+  const tooltip = document.getElementById("tooltip");
+  el.querySelectorAll("rect[data-name]").forEach(rect => {
+    rect.addEventListener("mousemove", e => {
+      const d = Number(rect.dataset.days);
+      tooltip.innerHTML = `<div class="t-title">${rect.dataset.name}</div><div>${d < 0 ? Math.abs(d) + " days overdue" : d + " days left"}</div>`;
+      tooltip.style.left = (e.clientX + 14) + "px";
+      tooltip.style.top = (e.clientY - 10) + "px";
+      tooltip.classList.add("show");
+    });
+    rect.addEventListener("mouseleave", () => tooltip.classList.remove("show"));
+  });
+}
+
+function renderInstallChart(rows) {
+  const el = document.getElementById("installChart");
+  const withDate = rows.filter(r => r.installed).sort((a, b) => a.installed - b.installed);
+  if (!withDate.length) { el.innerHTML = '<div class="empty-state">No installation dates found.</div>'; return; }
+
+  const counts = {};
+  withDate.forEach(r => {
+    const key = r.installed.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  const entries = Object.entries(counts);
+  const W = el.clientWidth || 420, PAD = { l: 30, r: 10, t: 10, b: 34 };
+  const barGap = 6;
+  const barW = Math.max(((W - PAD.l - PAD.r) / entries.length) - barGap, 6);
+  const H = 220;
+  const maxVal = Math.max(...entries.map(e => e[1]));
+  const yScale = v => (H - PAD.t - PAD.b) * (v / maxVal);
+
+  const bars = entries.map(([label, val], i) => {
+    const x = PAD.l + i * (barW + barGap);
+    const h = yScale(val);
+    const y = H - PAD.b - h;
+    return `<rect x="${x}" y="${y}" width="${barW}" height="${Math.max(h,2)}" rx="4" fill="var(--series-1)" data-label="${label}" data-val="${val}"/>
+      <text x="${x + barW/2}" y="${H - PAD.b + 14}" text-anchor="middle" font-size="9.5" fill="var(--text-muted)">${label}</text>`;
+  }).join("");
+
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">
+    <line x1="${PAD.l}" x2="${W - PAD.r}" y1="${H - PAD.b}" y2="${H - PAD.b}" stroke="var(--baseline)" stroke-width="1"/>
+    ${bars}
+  </svg>`;
+
+  const tooltip = document.getElementById("tooltip");
+  el.querySelectorAll("rect[data-label]").forEach(rect => {
+    rect.addEventListener("mousemove", e => {
+      tooltip.innerHTML = `<div class="t-title">${rect.dataset.label}</div><div>${rect.dataset.val} installed</div>`;
+      tooltip.style.left = (e.clientX + 14) + "px";
+      tooltip.style.top = (e.clientY - 10) + "px";
+      tooltip.classList.add("show");
+    });
+    rect.addEventListener("mouseleave", () => tooltip.classList.remove("show"));
+  });
+}
+
+function renderTable(rows) {
+  const statusFilter = document.getElementById("statusFilter").value;
+  const search = norm(document.getElementById("searchBox").value);
+
+  let filtered = rows.filter(r => {
+    if (statusFilter && computeStatus(r) !== statusFilter) return false;
+    if (search && !norm(r.apartment).includes(search)) return false;
+    return true;
+  });
+  filtered = filtered.slice().sort((a, b) => {
+    const da = a.daysLeft == null ? Infinity : a.daysLeft;
+    const db = b.daysLeft == null ? Infinity : b.daysLeft;
+    return da - db;
+  });
+
+  document.getElementById("rowCount").textContent = `${filtered.length} of ${rows.length} apartments`;
+  document.getElementById("emptyState").style.display = filtered.length ? "none" : "block";
+
+  const statusLabel = { good: "On schedule", warning: "Due soon", critical: "Overdue", pending: "Not yet scheduled" };
+  document.getElementById("logBody").innerHTML = filtered.map(r => {
+    const st = computeStatus(r);
+    return `<tr>
+      <td class="num">${r.serial ?? "—"}</td>
+      <td>${r.apartment}</td>
+      <td>${fmtDate(r.installed)}</td>
+      <td>${fmtDate(r.lastService)}</td>
+      <td>${fmtDate(r.nextService)}</td>
+      <td class="num">${r.daysLeft ?? "—"}</td>
+      <td><span class="badge ${st}"><span class="dot"></span>${statusLabel[st]}</span></td>
+    </tr>`;
+  }).join("");
+}
+
+async function load() {
+  document.getElementById("errorBanner").classList.remove("show");
+  document.getElementById("updatedAt").textContent = "Loading…";
+  try {
+    const rows = await fetchSheet();
+    state.rows = rows;
+    renderKpis(rows);
+    renderStatusChart(rows);
+    renderInstallChart(rows);
+    renderTable(rows);
+    document.getElementById("updatedAt").textContent = "Updated " + new Date().toLocaleTimeString();
+  } catch (err) {
+    console.error(err);
+    document.getElementById("errorBanner").classList.add("show");
+    document.getElementById("updatedAt").textContent = "Not connected";
+  }
+}
+
+document.getElementById("refreshBtn").addEventListener("click", load);
+document.getElementById("statusFilter").addEventListener("change", () => renderTable(state.rows));
+document.getElementById("searchBox").addEventListener("input", () => renderTable(state.rows));
+
+load();
+</script>
+</body>
+</html>
